@@ -33,7 +33,7 @@ func main() {
 	for {
 		select {
 		case e := <-uiEvents:
-			switch e {
+			switch e.Type {
 			case ui.Exit:
 				return
 			case ui.PlaybackNext:
@@ -42,6 +42,10 @@ func main() {
 				client.PlaybackPrev()
 			case ui.PlaybackToggle:
 				client.PlaybackTogglePlay()
+			case ui.PlayTrackByID:
+				if payload, ok := e.Payload.(ui.PlayTrackByIDPayload); ok {
+					client.PlayTrack(payload.TrackID)
+				}
 			}
 		case state := <-clientEvents:
 			uiHandler.Update(&state)

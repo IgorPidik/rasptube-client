@@ -8,14 +8,24 @@ import (
 	"github.com/gizak/termui/v3/widgets"
 )
 
-type UIEvent int
+type UIEventType int
 
 const (
-	Exit UIEvent = iota
+	Exit UIEventType = iota
 	PlaybackNext
 	PlaybackPrev
 	PlaybackToggle
+	PlayTrackByID
 )
+
+type UIEvent struct {
+	Type    UIEventType
+	Payload interface{}
+}
+
+type PlayTrackByIDPayload struct {
+	TrackID uint32
+}
 
 type UIHandler struct {
 	list     *widgets.List
@@ -85,13 +95,15 @@ func (h *UIHandler) consumeUIEvents(ch chan<- UIEvent) {
 		e := <-uiEvents
 		switch e.ID {
 		case "q", "<C-c>":
-			ch <- Exit
+			ch <- UIEvent{Type: Exit}
 		case "n":
-			ch <- PlaybackNext
+			ch <- UIEvent{Type: PlaybackNext}
 		case "p":
-			ch <- PlaybackPrev
+			ch <- UIEvent{Type: PlaybackPrev}
 		case "<Space>":
-			ch <- PlaybackToggle
+			ch <- UIEvent{Type: PlaybackToggle}
+		case "<Enter>":
+			ch <- UIEvent{Type: PlayTrackByID, Payload: PlayTrackByIDPayload{TrackID: h.playlist.Tracks[h.list.SelectedRow].ID}}
 		case "j", "<Down>":
 			h.list.ScrollDown()
 		case "k", "<Up>":

@@ -5,16 +5,20 @@ import (
 	"encoding/json"
 	"log"
 	"rasptube-client/models"
+	"strconv"
 
 	zmq "github.com/go-zeromq/zmq4"
 )
 
-const PLAYBACK_TOGGLE_PLAY = "PLAYBACK_TOGGLE_PLAY"
-const PLAYBACK_PLAY = "PLAYBACK_PLAY"
-const PLAYBACK_STOP = "PLAYBACK_STOP"
-const PLAYBACK_NEXT = "PLAYBACK_NEXT"
-const PLAYBACK_PREV = "PLAYBACK_PREV"
-const INIT_STATE = "INIT_STATE"
+const (
+	PLAYBACK_TOGGLE_PLAY = "PLAYBACK_TOGGLE_PLAY"
+	PLAYBACK_STOP        = "PLAYBACK_STOP"
+	PLAYBACK_PLAY        = "PLAYBACK_PLAY"
+	PLAYBACK_NEXT        = "PLAYBACK_NEXT"
+	PLAYBACK_PREV        = "PLAYBACK_PREV"
+	PLAY_TRACK_BY_ID     = "PLAY_TACK_BY_ID"
+	INIT_STATE           = "INIT_STATE"
+)
 
 type Client struct {
 	req zmq.Socket
@@ -61,21 +65,34 @@ func (c *Client) Init() (*models.InitState, error) {
 	return &initState, nil
 }
 
-func (c *Client) sendCommand(command string) (*zmq.Msg, error) {
-	if err := c.req.Send(zmq.NewMsgString(command)); err != nil {
+func (c *Client) sendMessage(msg *zmq.Msg) (*zmq.Msg, error) {
+	if err := c.req.Send(*msg); err != nil {
 		return nil, err
 	}
 
-	msg, recvErr := c.req.Recv()
+	recvMsg, recvErr := c.req.Recv()
 	if recvErr != nil {
 		return nil, recvErr
 	}
 
-	return &msg, nil
+	return &recvMsg, nil
+}
+
+func (c *Client) sendCommand(command string) (*zmq.Msg, error) {
+	msg := zmq.NewMsgString(command)
+	return c.sendMessage(&msg)
 }
 
 func (c *Client) PlaybackTogglePlay() error {
 	_, err := c.sendCommand(PLAYBACK_TOGGLE_PLAY)
+	return err
+}
+
+func (c *Client) PlayTrack(trackID uint32) error {
+	command := []byte(PLAY_TRACK_BY_ID)
+	stringTrackID := []byte(strconv.FormatUint(uint64(trackID), 10))
+	request := zmq.NewMsgFrom(command, stringTrackID)
+	_, err := c.sendMessage(&request)
 	return err
 }
 

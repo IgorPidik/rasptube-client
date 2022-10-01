@@ -1,19 +1,19 @@
 package models
 
 type Track struct {
-	ID   uint
+	ID   uint32
 	Name string
 	Url  string
 }
 
 type Playlist struct {
-	ID     uint
+	ID     uint32
 	Tracks []*Track
 }
 
 type PlaybackState struct {
-	PlaylistID uint
-	TrackID    uint
+	PlaylistID uint32
+	TrackID    uint32
 	Playing    bool
 }
 
