@@ -12,9 +12,11 @@ type Playlist struct {
 }
 
 type PlaybackState struct {
-	PlaylistID uint32
-	TrackID    uint32
-	Playing    bool
+	PlaylistID       uint32
+	TrackID          uint32
+	Playing          bool
+	TrackCurrentTime uint32
+	TrackTotalTime   uint32
 }
 
 type InitState struct {

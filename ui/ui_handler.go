@@ -28,9 +28,11 @@ type PlayTrackByIDPayload struct {
 }
 
 type UIHandler struct {
-	list     *widgets.List
-	grid     *termui.Grid
-	playlist *models.Playlist
+	playlistWidget *widgets.List
+	grid           *termui.Grid
+	controlsWidget *widgets.Table
+	seekbarWidget  *widgets.Gauge
+	playlist       *models.Playlist
 }
 
 func NewUIHandler(playlist *models.Playlist) (*UIHandler, error) {
@@ -61,18 +63,17 @@ func NewUIHandler(playlist *models.Playlist) (*UIHandler, error) {
 	controls.Border = false
 
 	seekbar := widgets.NewGauge()
-	seekbar.Percent = 100
-	seekbar.Label = fmt.Sprintf("%v%% (100MBs free)", seekbar.Percent)
+	seekbar.Percent = 0
 	seekbar.Border = false
 
 	grid.Set(
 		termui.NewRow(8.0/10, l),
-		termui.NewRow(0.8/10,
+		termui.NewRow(1.0/10,
 			termui.NewCol(1.0/3, nil),
 			termui.NewCol(1.0/3, controls),
 			termui.NewCol(1.0/3, nil),
 		),
-		termui.NewRow(0.5/10,
+		termui.NewRow(1.0/10,
 			termui.NewCol(1.0/3, nil),
 			termui.NewCol(1.0/3, seekbar),
 			termui.NewCol(1.0/3, nil),
@@ -80,7 +81,13 @@ func NewUIHandler(playlist *models.Playlist) (*UIHandler, error) {
 	)
 
 	termui.Render(grid)
-	return &UIHandler{list: l, grid: grid, playlist: playlist}, nil
+	return &UIHandler{
+		playlistWidget: l,
+		grid:           grid,
+		controlsWidget: controls,
+		seekbarWidget:  seekbar,
+		playlist:       playlist,
+	}, nil
 }
 
 func (h *UIHandler) Close() {
@@ -103,30 +110,30 @@ func (h *UIHandler) consumeUIEvents(ch chan<- UIEvent) {
 		case "<Space>":
 			ch <- UIEvent{Type: PlaybackToggle}
 		case "<Enter>":
-			ch <- UIEvent{Type: PlayTrackByID, Payload: PlayTrackByIDPayload{TrackID: h.playlist.Tracks[h.list.SelectedRow].ID}}
+			ch <- UIEvent{Type: PlayTrackByID, Payload: PlayTrackByIDPayload{TrackID: h.playlist.Tracks[h.playlistWidget.SelectedRow].ID}}
 		case "j", "<Down>":
-			h.list.ScrollDown()
+			h.playlistWidget.ScrollDown()
 		case "k", "<Up>":
-			h.list.ScrollUp()
+			h.playlistWidget.ScrollUp()
 		case "<C-d>":
-			h.list.ScrollHalfPageDown()
+			h.playlistWidget.ScrollHalfPageDown()
 		case "<C-u>":
-			h.list.ScrollHalfPageUp()
+			h.playlistWidget.ScrollHalfPageUp()
 		case "<C-f>":
-			h.list.ScrollPageDown()
+			h.playlistWidget.ScrollPageDown()
 		case "<C-b>":
-			h.list.ScrollPageUp()
+			h.playlistWidget.ScrollPageUp()
 		case "g":
 			if previousKey == "g" {
-				h.list.ScrollTop()
+				h.playlistWidget.ScrollTop()
 			}
 		case "<Home>":
-			h.list.ScrollTop()
+			h.playlistWidget.ScrollTop()
 		case "G", "<End>":
-			h.list.ScrollBottom()
+			h.playlistWidget.ScrollBottom()
 		case "<Resize>":
 			x, y := termui.TerminalDimensions()
-			h.list.SetRect(0, 0, x, y)
+			h.playlistWidget.SetRect(0, 0, x, y)
 		}
 		termui.Render(h.grid)
 	}
@@ -139,7 +146,22 @@ func (h *UIHandler) StartHandlingEvents() <-chan UIEvent {
 }
 
 func (h *UIHandler) Update(state *models.PlaybackState) {
-	h.list.Rows = h.updateRows(state)
+	h.playlistWidget.Rows = h.updateRows(state)
+
+	if state.Playing {
+		h.controlsWidget.Rows[0][1] = "Pause"
+	} else {
+		h.controlsWidget.Rows[0][1] = "Play"
+	}
+
+	if state.TrackTotalTime > 0 {
+		h.seekbarWidget.Percent = int(100 * (float32(state.TrackCurrentTime) / float32(state.TrackTotalTime)))
+	} else {
+		h.seekbarWidget.Percent = 0
+	}
+
+	h.seekbarWidget.Label = fmt.Sprintf("%s/%s", FormatMilliseconds(state.TrackCurrentTime), FormatMilliseconds(state.TrackTotalTime))
+
 	termui.Render(h.grid)
 }
 
