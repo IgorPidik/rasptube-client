@@ -6,6 +6,7 @@ import (
 	"log"
 	"rasptube-client/models"
 	"strconv"
+	"sync"
 
 	zmq "github.com/go-zeromq/zmq4"
 )
@@ -25,14 +26,13 @@ type Client struct {
 	sub zmq.Socket
 }
 
-func NewClient() (*Client, error) {
-	req := zmq.NewReq(context.Background())
+func NewClient(ctx context.Context) (*Client, error) {
+	req := zmq.NewReq(ctx)
 	if err := req.Dial("tcp://localhost:5559"); err != nil {
 		return nil, err
 	}
 
-	sub := zmq.NewSub(context.Background())
-
+	sub := zmq.NewSub(ctx)
 	if err := sub.Dial("tcp://localhost:5563"); err != nil {
 		return nil, err
 	}
@@ -106,16 +106,21 @@ func (c *Client) PlaybackPrev() error {
 	return err
 }
 
-func (c *Client) PollClientEvents() <-chan models.PlaybackState {
+func (c *Client) PollClientEvents(wg *sync.WaitGroup) <-chan models.PlaybackState {
 	stateChan := make(chan models.PlaybackState)
-	go listenToPublisher(c.sub, stateChan)
+	go listenToPublisher(c.sub, stateChan, wg)
 	return stateChan
 }
 
-func listenToPublisher(sub zmq.Socket, ch chan<- models.PlaybackState) {
+func listenToPublisher(sub zmq.Socket, ch chan<- models.PlaybackState, wg *sync.WaitGroup) {
 	for {
 		msg, err := sub.Recv()
 		if err != nil {
+			if err == context.Canceled {
+				close(ch)
+				wg.Done()
+				return
+			}
 			log.Fatalf("could not receive message: %v", err)
 		}
 

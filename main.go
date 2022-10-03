@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"log"
 	"rasptube-client/client"
 	"rasptube-client/ui"
+	"sync"
 )
 
 func main() {
-	client, clientErr := client.NewClient()
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	client, clientErr := client.NewClient(ctx)
 	if clientErr != nil {
 		log.Fatalf("failed to init client: %v\n", clientErr)
 	}
@@ -28,14 +34,16 @@ func main() {
 	uiHandler.Update(initState.State)
 
 	uiEvents := uiHandler.StartHandlingEvents()
-	clientEvents := client.PollClientEvents()
+	clientEvents := client.PollClientEvents(wg)
 
+out:
 	for {
 		select {
 		case e := <-uiEvents:
 			switch e.Type {
 			case ui.Exit:
-				return
+				cancel()
+				break out
 			case ui.PlaybackNext:
 				client.PlaybackNext()
 			case ui.PlaybackPrev:
@@ -51,4 +59,5 @@ func main() {
 			uiHandler.Update(&state)
 		}
 	}
+	wg.Wait()
 }

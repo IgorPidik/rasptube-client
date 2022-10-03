@@ -103,6 +103,8 @@ func (h *UIHandler) consumeUIEvents(ch chan<- UIEvent) {
 		switch e.ID {
 		case "q", "<C-c>":
 			ch <- UIEvent{Type: Exit}
+			close(ch)
+			return
 		case "n":
 			ch <- UIEvent{Type: PlaybackNext}
 		case "p":
